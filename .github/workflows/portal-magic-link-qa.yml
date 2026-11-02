@@ -1,0 +1,37 @@
+name: ZOS Portal Magic Link Staging Review
+on:
+  pull_request:
+    branches: [main]
+    paths: ['app.js', 'index.html', '.github/workflows/portal-magic-link-qa.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Verify Magic Link callback is not a first-factor-only login
+        run: |
+          node --check app.js
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const src=readFileSync('app.js','utf8');
+          const html=readFileSync('index.html','utf8');
+          assert.match(src,/async function acceptMagicLinkFragment\(/);
+          assert.match(src,/history\.replaceState\(null,''\x2clocation\.pathname\+location\.search\)/);
+          assert.match(src,/await call\('auth\/link'/);
+          assert.match(src,/await beginSecondFactor\(\)/);
+          assert.match(src,/await call\('auth\/totp'/);
+          assert.doesNotMatch(src,/localStorage\.setItem|sessionStorage\.setItem/);
+          assert.match(html,/رابط آمن إلى بريدك/);
+          assert.doesNotMatch(html,/value="[^"]+@[^"]+"/);
+          console.log('MAGIC_LINK_CLIENT_FAIL_CLOSED_SOURCE_PASS');
+          NODE
