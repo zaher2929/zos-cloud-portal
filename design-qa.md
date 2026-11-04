@@ -3,24 +3,33 @@
 final result: blocked
 
 Selected target: third displayed Relationship Green concept.
-Existing repository adapted, no replacement application or auth bypass.
+Existing repository adapted; deployed OTP/TOTP path unchanged.
 
-Validation: JavaScript module syntax checks PASS. Eight executable checks PASS:
-missing, empty, oversized, unsupported extension, signature mismatch, valid PDF,
-valid XLSX container header, SHA-256 known vector. Run: node documents.test.mjs.
+## Verified
+- 8 executable document-validation / SHA-256 checks PASS.
+- 4 upload-receipt evidence checks PASS (missing record, wrong hash, failed custody, matching evidence).
+- JavaScript syntax checks PASS.
+- Local browser connectivity repaired using sites-preview.
+- Browser: home-to-statements navigation PASS; invalid file rejected PASS;
+  fixture upload displays record with custody PASS and identity NOT VERIFIED PASS;
+  duplicate fixture rejected without adding a record PASS. Stale sending label fixed.
+- Fixture preview is separate from index.html. It has no real auth or API calls,
+  uses an explicit dummy hash because local HTTP lacks Web Crypto, and is NOT
+  evidence of live custody, hashing in browser, or authenticated integration.
 
-Browser attempt: http://terminal.local:4173/ returned ERR_CONNECTION_REFUSED.
-Authenticated mobile layout and upload round trip have NOT been visually verified.
-No design fidelity PASS, hosted CI PASS, or live upload claim is made.
+## Remaining blockers
+- Exact 390x844 visual comparison with the selected reference, artwork/icon fidelity.
+- Browser export interactions and console review.
+- Owner-authenticated HTTPS Staging upload round trip and server negative tests.
+- General report-file intake API/schema does not exist in inspected backend v6;
+  this PR retains statement upload and existing report export only.
+- Production Financial Read consumer cutover remains separately governed.
+- Claude written review and owner approval before merge/deploy.
 
-Release blockers:
-- Restore local browser-preview connectivity and compare the green screen at 390x844.
-- Owner-authenticated Staging integration tests, with dummy documents only.
-- Server-side validation, duplicate/custody evidence and false-success negative tests.
-- General report-upload API does not exist in the inspected client contract;
-  report export is existing behavior, not generic report-file intake.
-- Existing backend points to Staging; Production Financial Read consumer cutover
-  remains separately governed. No Production changes or financial posting.
-- Independent Claude review and owner approval before merge/deploy.
-
-PR #1 Magic Link auth candidate remains separate and unmodified.
+## Live backend inspection
+Read-only inspection of zos-owner-portal-staging v6 confirms a separate,
+owner+TOTP-gated multipart upload with 10 MiB limit, original-byte SHA-256,
+reserve/duplicate response, private Storage upload with upsert false,
+readback hash and custody RPC. This is code inspection, not live execution proof.
+No schema, Edge Function, Production, secret or financial changes made.
+PR #1 Magic Link candidate remains unchanged.
