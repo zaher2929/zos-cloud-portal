@@ -39,7 +39,7 @@ async function openApp(){
  clearInterval(alertsTimer);alertsTimer=setInterval(async()=>{if(!token||busy)return;try{const d=await call('notifications');if(d.rows[0]&&d.rows[0].id>latestAlert){latestAlert=d.rows[0].id;notice(d.rows[0].status+' — '+d.rows[0].message);}}catch{}},15000);
  const install=el('button','تثبيت التطبيق');install.type='button';install.hidden=!installPrompt;install.onclick=async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;install.hidden=true;}};$('navigation').append(install);
 }
-const QUICK=[['home','الرئيسية','⌂'],['collections','التحصيل','↙'],['customers','العملاء','♧'],['ask','اسأل','✦'],['more','المزيد','☰']];
+const QUICK=[['home','الرئيسية','⌂'],['customers','العملاء','♧'],['statements','المستندات','▤'],['reports','التقارير','▥'],['more','المزيد','☰']];
 const icons={tower:'◈',statements:'▤',approvals:'✓',customers:'♧',collections:'↙',sales:'↗',activities:'⌖',reports:'▥',ask:'✦',audit:'≡',security:'◇',settings:'⚙'};
 async function navigate(id){page=id;document.querySelector('.app-shell')?.classList.remove('nav-open');document.querySelector('#quick-nav [aria-expanded]')?.setAttribute('aria-expanded','false');if(id==='home'){document.querySelectorAll('[data-page]').forEach(n=>n.getAttribute('data-page')==='home'?n.setAttribute('aria-current','page'):n.removeAttribute('aria-current'));$('breadcrumb').textContent='ZOS Cloud / الرئيسية';$('view').replaceChildren();const head=el('div',undefined,'page-head home-head'),copy=el('div'),h=new Date().getHours();copy.append(el('p',new Intl.DateTimeFormat('ar-SA',{dateStyle:'full',calendar:'gregory'}).format(new Date()),'eyebrow'),el('h1',(h<12?'صباح الخير':'مساء الخير')+'، زاهر'));head.append(copy);$('view').append(head);return homeView();}document.querySelectorAll('[data-page]').forEach(n=>n.getAttribute('data-page')===id?n.setAttribute('aria-current','page'):n.removeAttribute('aria-current'));const title=id==='home'?'البوابة الرئيسية':SECTIONS.find(x=>x[0]===id)?.[1]||'البوابة';$('breadcrumb').textContent='ZOS Cloud / '+title;$('view').replaceChildren();
  const head=el('div',undefined,'page-head'),copy=el('div');copy.append(el('p',new Intl.DateTimeFormat('ar-SA',{dateStyle:'full',calendar:'gregory'}).format(new Date()),'eyebrow'),el('h1',id==='home'?'صباح القرار الواضح، زاهر':title),el('p',id==='home'?'كل منظومتك في مكان واحد. ابدأ بما يحتاج قرارك اليوم.':SECTIONS.find(x=>x[0]===id)?.[2]));head.append(copy,badge('REVIEW'));$('view').append(head);
@@ -50,6 +50,10 @@ async function navigate(id){page=id;document.querySelector('.app-shell')?.classL
 }
 const sar=v=>v===null||v===undefined||v===''||Number.isNaN(Number(v))?'غير متوفر':Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 async function homeView(){
+ const intro=el('section',undefined,'relationship-intro');intro.append(el('p','مساحة المالك · نسخة المراجعة STAGING','eyebrow'),el('h2','علاقات أقوى.'),el('p','خطوة واحدة في كل مرة.'));
+ const search=el('button','ابحث عن عميل','customer-search');search.type='button';search.onclick=()=>run(()=>navigate('customers'));intro.append(search);$('view').append(intro);
+ const docs=el('section',undefined,'document-focus');docs.append(el('p','الكشوف والتقارير','eyebrow'),el('h2','مستندك، بداية واضحة.'),el('p','ارفع الكشف الأصلي وتابع أدلة الحفظ والتحقق. الرفع لا يعني اعتماداً أو ترحيلاً مالياً.'));
+ const upload=el('button','رفع كشف ومتابعة حالته','primary full');upload.type='button';upload.onclick=()=>run(()=>navigate('statements'));const reports=el('button','عرض التقارير','text-button');reports.type='button';reports.onclick=()=>run(()=>navigate('reports'));docs.append(upload,reports);$('view').append(docs);
  const d=await call('financial');let names=[],goals={};
  try{names=(await call('customers/list')).rows.filter(m=>m.status==='PASS');}catch{}
  try{goals=(await call('settings/read')).settings?.goals?.value||{};}catch{}
@@ -78,3 +82,4 @@ bindLogin();
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{});
 // No JWT, owner data, or Financial API response is persisted to browser storage.
+
