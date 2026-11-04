@@ -15,14 +15,61 @@ async function call(action,body={},options={}){
 }
 const messages={LOGIN_LOCKED:'الدخول مقفل بعد خمس محاولات. حاول بعد ٣٠ دقيقة.',OWNER_ONLY:'الدخول متاح لبريد المالك فقط.',SEND_RATE_LIMIT:'انتظر دقيقة قبل طلب رمز جديد.',EMAIL_CODE_INVALID:'رمز البريد غير صالح أو منتهٍ.',TOTP_INVALID:'رمز تطبيق المصادقة غير صحيح.',EMAIL_DELIVERY_UNVERIFIED:'تعذر تأكيد إرسال البريد. راجع إعدادات البريد في Supabase.',AAL2_REQUIRED:'يلزم إكمال المصادقة الثنائية.',SESSION_INVALID_OR_EXPIRED:'انتهت صلاحية الجلسة. أعد الدخول.'};
 async function run(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(x=>x.disabled=true);try{await fn();}catch(e){notice(e.message,true);}finally{busy=false;document.querySelectorAll('button').forEach(x=>x.disabled=false);}}
+// Magic Link fragment is supplied by Supabase Auth, not by query strings.
+// Never persist access_token or refresh_token to browser storage.
+// Scrub URL before any async Auth requests and require server-verified owner + TOTP.
+async function acceptMagicLinkFragment(){
+ const params=new URLSearchParams(location.hash.replace(/^#/,''));
+ if(!['access_token','refresh_token','error','error_code'].some(key=>params.has(key)))return;
+ const bearer=params.get('access_token');
+ const kind=params.get('type');
+ const error=params.has('error');
+ history.replaceState(null,'',location.pathname+location.search);
+ if(error||params.getAll('access_token').length!==1||params.getAll('type').length!==1||!bearer||!/^eyJ[A-Za-z0-9._~-]{80,5000}$/.test(bearer)||kind!=='magiclink'){
+  notice('رابط الدخول غير صالح أو منتهي. اطلب رابطاً جديداً.',true);return;
+ }
+ await run(async()=>{
+  token=bearer;
+  try{
+   await call('auth/link',{});
+   await beginSecondFactor();
+  }catch(e){token='';factor='';throw e;}
+ });
+}
+async function beginSecondFactor(){
+ const f=await call('auth/factors');
+ factor=f.factors.find(x=>x.status==='verified')?.id;
+ if(!factor){
+  const enrolled=await call('auth/enroll');
+  factor=enrolled.id;
+  $('totp-secret').textContent=enrolled.totp.secret;
+  $('enrollment').hidden=false;
+ }
+ $('email-form').hidden=true;
+ $('otp-form').hidden=true;
+ $('totp-form').hidden=false;
+ $('step-email').removeAttribute('aria-current');
+ $('step-totp').setAttribute('aria-current','step');
+ $('login-title').textContent='التحقق الثاني';
+ $('login-description').textContent='أدخل رمز تطبيق المصادقة لإكمال الدخول.';
+ $('totp-code').focus();
+ notice('تم التحقق من رابط البريد. البيانات محجوبة حتى إتمام المصادقة الثانية.');
+}
 function bindLogin(){
- $('email-form').onsubmit=e=>{e.preventDefault();run(async()=>{await call('auth/send',{email:$('email').value.trim()});$('email-form').hidden=true;$('otp-form').hidden=false;$('email-code').focus();notice('أرسلنا طلب الرمز إلى بريد المالك.');});};
+ $('login-description').textContent='رابط آمن إلى بريدك ثم رمز تطبيق المصادقة. لا تفتح أي بيانات قبل إكمال الخطوتين.';
+ $('email-form').querySelector('button[type=submit]').textContent='إرسال رابط الدخول';
+ $('email-form').onsubmit=e=>{e.preventDefault();run(async()=>{
+  await call('auth/send',{email:$('email').value.trim()});
+  $('email-form').hidden=true;
+  $('otp-form').hidden=false;
+  $('otp-form').querySelector('label').textContent='إذا وصلتك رسالة برمز رقمي بدل الرابط';
+  $('otp-form').querySelector('button[type=submit]').textContent='التحقق من الرمز (اختياري)';
+  notice('أرسلنا رابط الدخول إلى البريد. افتح الرابط على هذا الجهاز للمتابعة.');
+ });};
  $('resend').onclick=()=>run(async()=>{await call('auth/send',{email:$('email').value.trim()});notice('تم طلب رمز جديد.');});
  $('otp-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   const code=$('email-code').value;$('email-code').value='';const r=await call('auth/email',{email:$('email').value.trim(),code});token=r.access_token;
-  const f=await call('auth/factors');factor=f.factors.find(x=>x.status==='verified')?.id;
-  if(!factor){const enrolled=await call('auth/enroll');factor=enrolled.id;$('totp-secret').textContent=enrolled.totp.secret;$('enrollment').hidden=false;}
-  $('otp-form').hidden=true;$('totp-form').hidden=false;$('step-email').removeAttribute('aria-current');$('step-totp').setAttribute('aria-current','step');$('login-title').textContent='التحقق الثاني';$('login-description').textContent='أدخل الرمز من تطبيق المصادقة لإكمال الدخول.';$('totp-code').focus();notice('تم التحقق من البريد. بيانات المنظومة ما زالت محجوبة.');
+  await beginSecondFactor();
  });};
  $('totp-form').onsubmit=e=>{e.preventDefault();run(async()=>{const code=$('totp-code').value;$('totp-code').value='';const r=await call('auth/totp',{factor,code});token=r.access_token;deadline=Date.parse(r.expires_at);$('totp-secret').textContent='';await call('session');await openApp();});};
 }
@@ -75,6 +122,7 @@ async function dashboard(id){
 }
 async function auditView(){const form=el('form',undefined,'toolbar'),q=el('input');q.placeholder='ابحث عن الإجراء أو المنفّذ';q.setAttribute('aria-label','بحث سجل التدقيق');const select=el('select');select.setAttribute('aria-label','تصفية الحالة');for(const v of ['','PASS','REVIEW','BLOCK','NOT VERIFIED']){const o=el('option',v||'كل الحالات');o.value=v;select.append(o);}const b=el('button','بحث');b.type='submit';form.append(q,select,b);const list=el('div',undefined,'data-list');$('view').append(form,list);let offset=0;const more=el('button','التالي');more.type='button';more.onclick=()=>run(async()=>{offset+=50;await load();});$('view').append(more);async function load(){const d=await call('audit',{query:q.value,status:select.value,offset});list.replaceChildren();for(const x of d.rows){const r=el('article',undefined,'row');r.append(badge(x.status),el('h3',x.action),el('p',x.actor+' · '+new Date(x.at).toLocaleString('ar-SA')));const details=el('details');details.append(el('summary','قبل / بعد / الدليل'),el('pre',JSON.stringify({before:x.before_state,after:x.after_state,evidence:x.evidence},null,2),'inline-detail'));r.append(details);list.append(r);}more.hidden=d.rows.length<50;if(!d.rows.length)list.append(el('p','لا توجد نتائج مطابقة.'));}form.onsubmit=e=>{e.preventDefault();offset=0;run(load);};await load();}
 bindLogin();
+acceptMagicLinkFragment();
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{});
 // No JWT, owner data, or Financial API response is persisted to browser storage.
