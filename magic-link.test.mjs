@@ -18,4 +18,6 @@ assert.deepEqual((await check('#access_token='+bearer+'&access_token='+bearer+'&
 assert.deepEqual((await check('#access_token='+bearer+'&type=recovery')).events,['scrub','notice']);
 assert(source.includes("id==='home'?'⌂'"));
 assert(source.includes('quick-nav')); // Preserve newer main navigation.
+assert(source.includes('قد تكون حصة إرسال البريد في Supabase انتهت')); // Rate limit troubleshooting must not blame SMTP alone.
+assert(source.includes('لا تكرر الطلب الآن')); // Avoid encouraging repeated requests during provider quota exhaustion.
 console.log('10 Magic Link parsing/order/denial/navigation checks PASS');
