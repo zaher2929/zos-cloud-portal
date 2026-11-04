@@ -11,6 +11,13 @@ export async function validateDocument(file) {
  return extension;
 }
 export async function documentDigest(file) {
+ if (!globalThis.crypto?.subtle) throw Error('يلزم اتصال HTTPS آمن لحساب بصمة الملف. لم يُرسل الملف.');
  const bytes = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
  return Array.from(new Uint8Array(bytes), b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+export function verifyUploadReceipt(response, expectedHash) {
+ const record=response?.record;
+ if (!record || record.sha256!==expectedHash || record.custody_status!=='PASS') throw Error('لم يكتمل إثبات الحفظ والبصمة. حدّث سجل الكشوف قبل إعادة المحاولة.');
+ return record;
 }
