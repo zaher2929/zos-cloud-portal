@@ -1,7 +1,7 @@
 import { SECTIONS } from './sections.js';
 import { renderSection } from './views.js';
 const $=id=>document.getElementById(id);
-let token='',factor='',deadline=0,timer,alertsTimer,page='home',busy=false,installPrompt,latestAlert=0;
+let token='',factor='',deadline=0,timer,alertsTimer,page='home',busy=false,installPrompt,latestAlert=0,firstFactor='email';
 const API='https://jcvwcodhefqgzsxvoxzz.supabase.co/functions/v1/zos-owner-portal-staging/';
 const loginMarkup=$('root').innerHTML;
 function notice(text,error=false){const n=$('notice')||$('app-notice');if(n){n.textContent=text;n.classList.toggle('error',error);}}
@@ -13,7 +13,7 @@ async function call(action,body={},options={}){
  if(!r.ok||d.status==='BLOCK'&&action!=='overview'){if(r.status===401&&deadline)clearSession();throw Error(messages[d.code]||'تعذر إكمال الطلب. '+(d.code||d.status));}
  return d;
 }
-const messages={LOGIN_LOCKED:'الدخول مقفل بعد خمس محاولات. حاول بعد ٣٠ دقيقة.',OWNER_ONLY:'الدخول متاح لبريد المالك فقط.',SEND_RATE_LIMIT:'انتظر دقيقة قبل طلب رمز جديد.',EMAIL_CODE_INVALID:'رمز البريد غير صالح أو منتهٍ.',TOTP_INVALID:'رمز تطبيق المصادقة غير صحيح.',EMAIL_DELIVERY_UNVERIFIED:'تعذر إرسال رابط الدخول حالياً. قد تكون حصة إرسال البريد في Supabase انتهت. لا تكرر الطلب الآن؛ أعد المحاولة بعد تجدد الحصة، وإذا استمر الخطأ فراجع خدمة إرسال البريد.',AAL2_REQUIRED:'يلزم إكمال المصادقة الثنائية.',SESSION_INVALID_OR_EXPIRED:'انتهت صلاحية الجلسة. أعد الدخول.'};
+const messages={LOGIN_LOCKED:'الدخول مقفل بعد خمس محاولات. حاول بعد ٣٠ دقيقة.',OWNER_ONLY:'الدخول متاح لبريد المالك فقط.',SEND_RATE_LIMIT:'انتظر دقيقة قبل طلب رمز جديد.',EMAIL_CODE_INVALID:'رمز البريد غير صالح أو منتهٍ.',TOTP_INVALID:'رمز تطبيق المصادقة غير صحيح.',EMAIL_DELIVERY_UNVERIFIED:'تعذر إرسال رابط الدخول حالياً. قد تكون حصة إرسال البريد في Supabase انتهت. لا تكرر الطلب الآن؛ أعد المحاولة بعد تجدد الحصة، وإذا استمر الخطأ فراجع خدمة إرسال البريد.',INVALID_CREDENTIALS:'لم تكتمل المصادقة. راجع البريد وكلمة المرور.',PASSWORD_RATE_LIMIT:'تم قفل محاولات الدخول مؤقتاً لحماية الحساب.',AAL2_REQUIRED:'يلزم إكمال المصادقة الثنائية.',SESSION_INVALID_OR_EXPIRED:'انتهت صلاحية الجلسة. أعد الدخول.'};
 async function run(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(x=>x.disabled=true);try{await fn();}catch(e){notice(e.message,true);}finally{busy=false;document.querySelectorAll('button').forEach(x=>x.disabled=false);}}
 // Magic Link fragment is supplied by Supabase Auth, not by query strings.
 // Never persist access_token or refresh_token to browser storage.
@@ -29,7 +29,7 @@ async function acceptMagicLinkFragment(){
   notice('رابط الدخول غير صالح أو منتهي. اطلب رابطاً جديداً.',true);return;
  }
  await run(async()=>{
-  token=bearer;
+  token=bearer;firstFactor='email';
   try{
    await call('auth/link',{});
    await beginSecondFactor();
@@ -46,6 +46,7 @@ async function beginSecondFactor(){
   $('enrollment').hidden=false;
  }
  $('email-form').hidden=true;
+ $('password-form').hidden=true;
  $('otp-form').hidden=true;
  $('totp-form').hidden=false;
  $('step-email').removeAttribute('aria-current');
@@ -53,10 +54,37 @@ async function beginSecondFactor(){
  $('login-title').textContent='التحقق الثاني';
  $('login-description').textContent='أدخل رمز تطبيق المصادقة لإكمال الدخول.';
  $('totp-code').focus();
- notice('تم التحقق من رابط البريد. البيانات محجوبة حتى إتمام المصادقة الثانية.');
+ notice((firstFactor==='password'?'تم التحقق من كلمة المرور.':'تم التحقق من رابط البريد.')+' البيانات محجوبة حتى إتمام المصادقة الثانية.');
 }
 function bindLogin(){
- $('login-description').textContent='رابط آمن إلى بريدك ثم رمز تطبيق المصادقة. لا تفتح أي بيانات قبل إكمال الخطوتين.';
+ firstFactor='email';
+ $('login-description').textContent='رابط بريد أو كلمة مرور، ثم رمز تطبيق المصادقة. لا تفتح أي بيانات قبل إكمال الخطوتين.';
+ $('show-password').onclick=()=>{
+  $('email-form').hidden=true;
+  $('password-form').hidden=false;
+  $('password-email').value=$('email').value.trim();
+  $('login-description').textContent='أدخل البريد وكلمة المرور ثم رمز تطبيق المصادقة.';
+  $('password').focus();
+ };
+ $('show-email').onclick=()=>{
+  $('password').value='';
+  $('password-form').hidden=true;
+  $('email-form').hidden=false;
+  $('email').value=$('password-email').value.trim();
+  $('login-description').textContent='افتح رابط البريد ثم أدخل رمز تطبيق المصادقة.';
+ };
+ $('password-form').onsubmit=e=>{e.preventDefault();run(async()=>{
+  const email=$('password-email').value.trim();
+  const password=$('password').value;
+  $('password').value='';
+  token='';factor='';
+  try{
+   const result=await call('auth/password',{email,password});
+   token=result.access_token;
+   firstFactor='password';
+   await beginSecondFactor();
+  }catch(err){token='';factor='';throw err;}
+ });};
  $('email-form').querySelector('button[type=submit]').textContent='إرسال رابط الدخول';
  $('email-form').onsubmit=e=>{e.preventDefault();run(async()=>{
   await call('auth/send',{email:$('email').value.trim()});
