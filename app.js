@@ -13,7 +13,7 @@ async function call(action,body={},options={}){
  if(!r.ok||d.status==='BLOCK'&&action!=='overview'){if(r.status===401&&deadline)clearSession();throw Error(messages[d.code]||'تعذر إكمال الطلب. '+(d.code||d.status));}
  return d;
 }
-const messages={LOGIN_LOCKED:'الدخول مقفل بعد خمس محاولات. حاول بعد ٣٠ دقيقة.',OWNER_ONLY:'الدخول متاح لبريد المالك فقط.',SEND_RATE_LIMIT:'انتظر دقيقة قبل طلب رمز جديد.',EMAIL_CODE_INVALID:'رمز البريد غير صالح أو منتهٍ.',TOTP_INVALID:'رمز تطبيق المصادقة غير صحيح.',EMAIL_DELIVERY_UNVERIFIED:'تعذر تأكيد إرسال البريد. راجع إعدادات البريد في Supabase.',AAL2_REQUIRED:'يلزم إكمال المصادقة الثنائية.',SESSION_INVALID_OR_EXPIRED:'انتهت صلاحية الجلسة. أعد الدخول.'};
+const messages={LOGIN_LOCKED:'الدخول مقفل بعد خمس محاولات. حاول بعد ٣٠ دقيقة.',OWNER_ONLY:'الدخول متاح لبريد المالك فقط.',SEND_RATE_LIMIT:'انتظر دقيقة قبل طلب رمز جديد.',EMAIL_CODE_INVALID:'رمز البريد غير صالح أو منتهٍ.',TOTP_INVALID:'رمز تطبيق المصادقة غير صحيح.',EMAIL_DELIVERY_UNVERIFIED:'تعذر إرسال رابط الدخول حالياً. قد تكون حصة إرسال البريد في Supabase انتهت. لا تكرر الطلب الآن؛ أعد المحاولة بعد تجدد الحصة، وإذا استمر الخطأ فراجع خدمة إرسال البريد.',AAL2_REQUIRED:'يلزم إكمال المصادقة الثنائية.',SESSION_INVALID_OR_EXPIRED:'انتهت صلاحية الجلسة. أعد الدخول.'};
 async function run(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(x=>x.disabled=true);try{await fn();}catch(e){notice(e.message,true);}finally{busy=false;document.querySelectorAll('button').forEach(x=>x.disabled=false);}}
 // Magic Link fragment is supplied by Supabase Auth, not by query strings.
 // Never persist access_token or refresh_token to browser storage.
